@@ -1,6 +1,8 @@
 import { useNavigate } from 'react-router-dom'
 import { Button, Container } from 'react-bootstrap'
 import { useAuth } from '../context/AuthContext'
+import SideBar from '../components/chat_window/SideBar'
+import ChatWindow from '../components/chat_window/ChatWindow'
 
 const Chat = () => {
   const { user, logout } = useAuth()
@@ -12,13 +14,10 @@ const Chat = () => {
   }
 
   return (
-    <Container className="d-flex flex-column justify-content-center align-items-center vh-100">
-      <h4>Hello, {user?.name}</h4>
-      <p className="text-muted">Chat window</p>
-      <Button variant="outline-danger" size="sm" onClick={handleLogout}>
-        Logout
-      </Button>
-    </Container>
+     <div className="d-flex" style={{ height: '100vh', overflow: 'hidden' }}>
+      <SideBar currentUser={user} onLogout={handleLogout} />
+      <ChatWindow currentUser={user} />
+      </div>
   )
 }
 
