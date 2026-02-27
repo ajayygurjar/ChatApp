@@ -1,9 +1,10 @@
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const User = require("../models/User");
+const { Op } = require("sequelize");
 
 const generateToken = (userId) => {
-  return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '7d' });
+  return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: "7d" });
 };
 
 const signup = async (req, res) => {
@@ -12,12 +13,12 @@ const signup = async (req, res) => {
   try {
     const emailExists = await User.findOne({ where: { email } });
     if (emailExists) {
-      return res.status(400).json({ message: 'Email already exists' });
+      return res.status(400).json({ message: "Email already exists" });
     }
 
     const phoneExists = await User.findOne({ where: { phone } });
     if (phoneExists) {
-      return res.status(400).json({ message: 'Phone number already exists' });
+      return res.status(400).json({ message: "Phone number already exists" });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -39,7 +40,7 @@ const signup = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
@@ -47,16 +48,20 @@ const login = async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    const user = await User.findOne({ where: { email } });
+    const user = await User.findOne({
+      where: {
+        [Op.or]: [{ email }, { phone: email }], 
+      },
+    });
 
     if (!user) {
-      return res.status(400).json({ message: 'Invalid email or password' });
+      return res.status(400).json({ message: "Invalid email or password" });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
-      return res.status(400).json({ message: 'Invalid email or password' });
+      return res.status(400).json({ message: "Invalid email or password" });
     }
 
     res.status(200).json({
@@ -69,7 +74,7 @@ const login = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
