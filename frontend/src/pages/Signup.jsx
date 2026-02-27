@@ -8,9 +8,10 @@ const Signup = () => {
   const navigate = useNavigate()
   const { login } = useAuth()
 
-  const [username, setUsername] = useState('')
+  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [phone, setPhone] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -20,7 +21,7 @@ const Signup = () => {
     setError('')
 
     try {
-      const { data } = await API.post('/auth/signup', { username, email, password })
+      const { data } = await API.post('/auth/signup', { name, email, phone, password })
       login(data.user, data.token)
       navigate('/chat')
     } catch (err) {
@@ -42,12 +43,12 @@ const Signup = () => {
         <Form onSubmit={handleSubmit}>
 
           <Form.Group className="mb-3">
-            <Form.Label>Username</Form.Label>
+            <Form.Label>Name</Form.Label>
             <Form.Control
               type="text"
               placeholder="yourname"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
               required
             />
           </Form.Group>
@@ -59,6 +60,16 @@ const Signup = () => {
               placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </Form.Group>
+          <Form.Group className="mb-3">
+            <Form.Label>Phone</Form.Label>
+            <Form.Control
+              type="tel"
+              placeholder="Enter phone number"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
               required
             />
           </Form.Group>
