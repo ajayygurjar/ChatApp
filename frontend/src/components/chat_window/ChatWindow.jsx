@@ -2,11 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Container, Form, Button, InputGroup, Badge, Spinner } from 'react-bootstrap'
 import { io } from 'socket.io-client'
 import API from '../../utils/Api'
-
-
-const generateRoomId = (email1, email2) => {
-  return [email1, email2].sort().join('_')
-}
+import generateRoomId from '../../utils/roomId'
 
 const socket = io('http://localhost:5000', {
   auth: { token: localStorage.getItem('token') },
@@ -57,7 +53,7 @@ const ChatWindow = ({ currentUser, receiver }) => {
     setRoomError('')
 
     socket.emit('join_room', rid)
-    console.log('Joined room:', rid)
+    console.log('Auto joined room:', rid)
 
     setMessages([])
     fetchMessages()
@@ -82,7 +78,6 @@ const ChatWindow = ({ currentUser, receiver }) => {
     setRoomError('')
 
     try {
-      // Validate email exists in DB 
       const { data: users } = await API.get('/users')
       const target = users.find(
         u => u.email.toLowerCase() === emailInput.trim().toLowerCase()
@@ -97,16 +92,13 @@ const ChatWindow = ({ currentUser, receiver }) => {
         return
       }
 
-      // Generate room ID 
       const rid = generateRoomId(currentUser.email, target.email)
       setRoomId(rid)
       setEmailInput('')
 
-      // Emit join_room 
       socket.emit('join_room', rid)
       console.log('Joined room via email:', rid)
 
-      // Load message history
       const { data: msgs } = await API.get(`/messages/${target.id}`)
       setMessages(msgs)
 
@@ -137,7 +129,7 @@ const ChatWindow = ({ currentUser, receiver }) => {
         message: text.trim(),
       })
     } catch (err) {
-      console.error('Failed to save message to DB:', err)
+      console.error('Failed to save to DB:', err)
     }
 
     setMessages(prev => [...prev, msgPayload])
@@ -154,7 +146,6 @@ const ChatWindow = ({ currentUser, receiver }) => {
           Select a user or enter their email to chat
         </div>
 
-        {/* Email search box */}
         <Form onSubmit={handleJoinByEmail} style={{ width: 340 }}>
           <InputGroup>
             <Form.Control
@@ -164,14 +155,10 @@ const ChatWindow = ({ currentUser, receiver }) => {
               onChange={e => setEmailInput(e.target.value)}
               isInvalid={!!roomError}
             />
-            <Button type="submit" variant="primary">
-              Join Room
-            </Button>
+            <Button type="submit" variant="primary">Join Room</Button>
           </InputGroup>
           {roomError && (
-            <div className="text-danger mt-1" style={{ fontSize: 13 }}>
-              {roomError}
-            </div>
+            <div className="text-danger mt-1" style={{ fontSize: 13 }}>{roomError}</div>
           )}
         </Form>
 
