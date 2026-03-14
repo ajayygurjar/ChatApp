@@ -1,6 +1,7 @@
 const { Server } = require('socket.io')
 const socketAuthMiddleware = require('./middleware')
 const handleChat = require('./handlers/chat')
+const handlePersonalChat=require('./handlers/personalChat')
 
 const initSocket = (server, app) => {
   const io = new Server(server, {
@@ -13,7 +14,11 @@ const initSocket = (server, app) => {
   // Apply JWT auth middleware
   io.use(socketAuthMiddleware)
 
-  io.on('connection', (socket) => handleChat(socket))
+  io.on('connection', (socket) => {
+    handleChat(socket)
+    handlePersonalChat(socket,io)
+
+})
 
   app.set('io', io)
 
