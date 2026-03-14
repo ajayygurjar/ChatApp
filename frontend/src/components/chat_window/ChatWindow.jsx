@@ -3,60 +3,62 @@ import { Container, Form, Button, InputGroup, Badge, Spinner } from 'react-boots
 import { io } from 'socket.io-client'
 import API from '../../utils/Api'
 
+
+const generateRoomId = (email1, email2) => {
+  return [email1, email2].sort().join('_')
+}
+
+const socket = io('http://localhost:5000', {
+  auth: { token: localStorage.getItem('token') },
+})
+
 const ChatWindow = ({ currentUser, receiver }) => {
   const [messages, setMessages] = useState([])
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
-  const [connected, setConnected] = useState(false)
+  const [connected, setConnected] = useState(socket.connected)
+  const [roomId, setRoomId] = useState(null)
+  const [emailInput, setEmailInput] = useState('')
+  const [roomError, setRoomError] = useState('')
   const bottomRef = useRef(null)
-  const socketRef = useRef(null)
-
-  useEffect(() => {
-    if (!currentUser?.id) return
-
-    const socket = io('http://localhost:5000', {
-      auth: { token: localStorage.getItem('token') },
-    })
-
-    socketRef.current = socket
-
-    socket.on('connect', () => {
-      console.log('Socket connected:', socket.id)
-      setConnected(true)
-    })
-
-    socket.on('disconnect', () => setConnected(false))
-
-    socket.on('connect_error', (err) => {
-      console.error('Socket auth error:', err.message)
-      setConnected(false)
-    })
-
-    socket.on('newMessage', (msg) => {
-      setMessages(prev => {
-        const currentReceiverId = receiverRef.current?.id
-        if (
-          currentReceiverId &&
-          (msg.senderId === currentReceiverId || msg.receiverId === currentReceiverId)
-        ) {
-          return [...prev, msg]
-        }
-        return prev
-      })
-    })
-
-    return () => {
-      socket.disconnect()
-    }
-  }, [currentUser?.id])
-
   const receiverRef = useRef(receiver)
+
   useEffect(() => {
     receiverRef.current = receiver
   }, [receiver])
 
   useEffect(() => {
-    if (!receiver) return
+    socket.on('connect', () => setConnected(true))
+    socket.on('disconnect', () => setConnected(false))
+    socket.on('connect_error', (err) => {
+      console.error('Socket error:', err.message)
+      setConnected(false)
+    })
+
+    socket.on('new_message', (msg) => {
+      if (msg.senderId !== currentUser?.id) {
+        setMessages(prev => [...prev, msg])
+      }
+    })
+
+    return () => {
+      socket.off('connect')
+      socket.off('disconnect')
+      socket.off('connect_error')
+      socket.off('new_message')
+    }
+  }, [currentUser?.id])
+
+  useEffect(() => {
+    if (!receiver?.email || !currentUser?.email) return
+
+    const rid = generateRoomId(currentUser.email, receiver.email)
+    setRoomId(rid)
+    setRoomError('')
+
+    socket.emit('join_room', rid)
+    console.log('Joined room:', rid)
+
     setMessages([])
     fetchMessages()
   }, [receiver?.id])
@@ -74,29 +76,110 @@ const ChatWindow = ({ currentUser, receiver }) => {
     }
   }
 
+  const handleJoinByEmail = async (e) => {
+    e.preventDefault()
+    if (!emailInput.trim()) return
+    setRoomError('')
+
+    try {
+      // Validate email exists in DB 
+      const { data: users } = await API.get('/users')
+      const target = users.find(
+        u => u.email.toLowerCase() === emailInput.trim().toLowerCase()
+      )
+
+      if (!target) {
+        setRoomError('No user found with that email')
+        return
+      }
+      if (target.id === currentUser.id) {
+        setRoomError("You can't chat with yourself")
+        return
+      }
+
+      // Generate room ID 
+      const rid = generateRoomId(currentUser.email, target.email)
+      setRoomId(rid)
+      setEmailInput('')
+
+      // Emit join_room 
+      socket.emit('join_room', rid)
+      console.log('Joined room via email:', rid)
+
+      // Load message history
+      const { data: msgs } = await API.get(`/messages/${target.id}`)
+      setMessages(msgs)
+
+    } catch (err) {
+      console.error('Join by email failed:', err)
+      setRoomError('Something went wrong')
+    }
+  }
+
   const sendMessage = async (e) => {
     e.preventDefault()
-    if (!text.trim() || !receiver) return
+    if (!text.trim() || !receiver || !roomId) return
     setSending(true)
+
+    const msgPayload = {
+      roomId,
+      receiverId: receiver.id,
+      message: text.trim(),
+      senderId: currentUser.id,
+      createdAt: new Date().toISOString(),
+    }
+
+    socket.emit('new_message', msgPayload)
+
     try {
-      const { data } = await API.post('/messages/send', {
+      await API.post('/messages/send', {
         receiverId: receiver.id,
         message: text.trim(),
       })
-      setMessages(prev => [...prev, data])
-      setText('')
     } catch (err) {
-      console.error('Failed to send message', err)
-    } finally {
-      setSending(false)
+      console.error('Failed to save message to DB:', err)
     }
+
+    setMessages(prev => [...prev, msgPayload])
+    setText('')
+    setSending(false)
   }
 
   if (!receiver) {
     return (
       <div className="d-flex flex-column flex-grow-1 align-items-center justify-content-center"
         style={{ height: '100vh', background: '#f0f2f5' }}>
-        <div className="text-muted fs-5">Select a user to start chatting</div>
+
+        <div className="text-muted fs-5 mb-3">
+          Select a user or enter their email to chat
+        </div>
+
+        {/* Email search box */}
+        <Form onSubmit={handleJoinByEmail} style={{ width: 340 }}>
+          <InputGroup>
+            <Form.Control
+              type="email"
+              placeholder="Enter user email..."
+              value={emailInput}
+              onChange={e => setEmailInput(e.target.value)}
+              isInvalid={!!roomError}
+            />
+            <Button type="submit" variant="primary">
+              Join Room
+            </Button>
+          </InputGroup>
+          {roomError && (
+            <div className="text-danger mt-1" style={{ fontSize: 13 }}>
+              {roomError}
+            </div>
+          )}
+        </Form>
+
+        {roomId && (
+          <div className="text-muted mt-3" style={{ fontSize: 12 }}>
+            Room ID: <code>{roomId}</code>
+          </div>
+        )}
       </div>
     )
   }
@@ -111,12 +194,17 @@ const ChatWindow = ({ currentUser, receiver }) => {
           style={{ width: 38, height: 38, flexShrink: 0 }}>
           {receiver.name.charAt(0).toUpperCase()}
         </div>
-        <div>
+        <div className="flex-grow-1">
           <div className="fw-semibold">{receiver.name}</div>
           <Badge bg={connected ? 'success' : 'secondary'} style={{ fontSize: 10 }}>
             {connected ? 'Connected' : 'Connecting...'}
           </Badge>
         </div>
+        {roomId && (
+          <small className="text-muted" style={{ fontSize: 11 }}>
+            Room: <code>{roomId}</code>
+          </small>
+        )}
       </Container>
 
       {/* Messages Area */}
@@ -137,7 +225,9 @@ const ChatWindow = ({ currentUser, receiver }) => {
                 }}>
                 <div style={{ fontSize: 14 }}>{msg.message}</div>
                 <div style={{ fontSize: 11, opacity: 0.7, textAlign: 'right' }}>
-                  {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {new Date(msg.createdAt).toLocaleTimeString([], {
+                    hour: '2-digit', minute: '2-digit'
+                  })}
                 </div>
               </div>
             </div>
