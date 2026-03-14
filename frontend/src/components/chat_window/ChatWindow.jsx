@@ -1,49 +1,59 @@
-// ChatWindow.jsx
 import { useState, useEffect, useRef } from 'react'
 import { Container, Form, Button, InputGroup, Badge, Spinner } from 'react-bootstrap'
 import { io } from 'socket.io-client'
 import API from '../../utils/Api'
 
-const socket = io('http://localhost:5000')
-
 const ChatWindow = ({ currentUser, receiver }) => {
   const [messages, setMessages] = useState([])
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
-  const [connected, setConnected] = useState(socket.connected)  
+  const [connected, setConnected] = useState(false)
   const bottomRef = useRef(null)
+  const socketRef = useRef(null)
 
   useEffect(() => {
     if (!currentUser?.id) return
 
-    socket.emit('join', currentUser.id)
+    const socket = io('http://localhost:5000', {
+      auth: { token: localStorage.getItem('token') },
+    })
+
+    socketRef.current = socket
 
     socket.on('connect', () => {
+      console.log('Socket connected:', socket.id)
       setConnected(true)
-      socket.emit('join', currentUser.id)
     })
+
     socket.on('disconnect', () => setConnected(false))
 
+    socket.on('connect_error', (err) => {
+      console.error('Socket auth error:', err.message)
+      setConnected(false)
+    })
+
+    socket.on('newMessage', (msg) => {
+      setMessages(prev => {
+        const currentReceiverId = receiverRef.current?.id
+        if (
+          currentReceiverId &&
+          (msg.senderId === currentReceiverId || msg.receiverId === currentReceiverId)
+        ) {
+          return [...prev, msg]
+        }
+        return prev
+      })
+    })
+
     return () => {
-      socket.off('connect')
-      socket.off('disconnect')
+      socket.disconnect()
     }
   }, [currentUser?.id])
 
+  const receiverRef = useRef(receiver)
   useEffect(() => {
-    const handleNewMessage = (msg) => {
-      if (
-        receiver &&
-        (msg.senderId === receiver.id || msg.receiverId === receiver.id)
-      ) {
-        setMessages(prev => [...prev, msg])
-      }
-    }
-
-    socket.on('newMessage', handleNewMessage)
-
-    return () => socket.off('newMessage', handleNewMessage)
-  }, [receiver?.id])
+    receiverRef.current = receiver
+  }, [receiver])
 
   useEffect(() => {
     if (!receiver) return

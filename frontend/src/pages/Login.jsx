@@ -1,12 +1,14 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate,Navigate } from 'react-router-dom'
 import { Form, Button, Card, Alert, Container } from 'react-bootstrap'
 import { useAuth } from '../context/AuthContext'
 import API from '../utils/Api'
 
 const Login = () => {
   const navigate = useNavigate()
-  const { login } = useAuth()
+  const { login,user } = useAuth()
+
+  if (user) return <Navigate to="/chat" />
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
