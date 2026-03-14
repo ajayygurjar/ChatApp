@@ -1,20 +1,54 @@
+// ChatWindow.jsx
 import { useState, useEffect, useRef } from 'react'
 import { Container, Form, Button, InputGroup, Badge, Spinner } from 'react-bootstrap'
+import { io } from 'socket.io-client'
 import API from '../../utils/Api'
+
+const socket = io('http://localhost:5000')
 
 const ChatWindow = ({ currentUser, receiver }) => {
   const [messages, setMessages] = useState([])
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
+  const [connected, setConnected] = useState(socket.connected)  
   const bottomRef = useRef(null)
+
+  useEffect(() => {
+    if (!currentUser?.id) return
+
+    socket.emit('join', currentUser.id)
+
+    socket.on('connect', () => {
+      setConnected(true)
+      socket.emit('join', currentUser.id)
+    })
+    socket.on('disconnect', () => setConnected(false))
+
+    return () => {
+      socket.off('connect')
+      socket.off('disconnect')
+    }
+  }, [currentUser?.id])
+
+  useEffect(() => {
+    const handleNewMessage = (msg) => {
+      if (
+        receiver &&
+        (msg.senderId === receiver.id || msg.receiverId === receiver.id)
+      ) {
+        setMessages(prev => [...prev, msg])
+      }
+    }
+
+    socket.on('newMessage', handleNewMessage)
+
+    return () => socket.off('newMessage', handleNewMessage)
+  }, [receiver?.id])
 
   useEffect(() => {
     if (!receiver) return
     setMessages([])
     fetchMessages()
-
-    const interval = setInterval(fetchMessages, 3000)   
-    return () => clearInterval(interval)                
   }, [receiver?.id])
 
   useEffect(() => {
@@ -48,12 +82,11 @@ const ChatWindow = ({ currentUser, receiver }) => {
     }
   }
 
-  // No user selected yet
   if (!receiver) {
     return (
       <div className="d-flex flex-column flex-grow-1 align-items-center justify-content-center"
         style={{ height: '100vh', background: '#f0f2f5' }}>
-        <div className="text-muted fs-5"> Select a user to start chatting</div>
+        <div className="text-muted fs-5">Select a user to start chatting</div>
       </div>
     )
   }
@@ -70,7 +103,9 @@ const ChatWindow = ({ currentUser, receiver }) => {
         </div>
         <div>
           <div className="fw-semibold">{receiver.name}</div>
-          <Badge bg="success" style={{ fontSize: 10 }}>Online</Badge>
+          <Badge bg={connected ? 'success' : 'secondary'} style={{ fontSize: 10 }}>
+            {connected ? 'Connected' : 'Connecting...'}
+          </Badge>
         </div>
       </Container>
 

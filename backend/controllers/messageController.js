@@ -11,6 +11,9 @@ const sendMessage = async (req, res) => {
       receiverId,
       message,
     })
+
+    const io=req.app.get('io');
+    io.to(`user_${receiverId}`).emit('newMessage',newMessage);
     res.status(201).json(newMessage)
   } catch (err) {
     console.error(err)
