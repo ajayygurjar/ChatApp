@@ -8,6 +8,7 @@ const sequelize = require("./config/db");
 const authRoutes = require("./routes/authRoutes");
 const messageRoutes = require("./routes/messageRoutes");
 const userRoutes = require("./routes/userRoutes");
+const mediaRoutes = require("./routes/mediaRoutes");
 const initSocket = require("./socket-io/index");
 
 require("./models/User");
@@ -24,6 +25,7 @@ app.use(express.json());
 app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/media", mediaRoutes);
 
 const PORT = process.env.PORT || 5000;
 

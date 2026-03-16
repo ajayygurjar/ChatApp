@@ -1,9 +1,11 @@
+
 import { useState, useEffect, useRef } from 'react'
 import { Container, Form, Button, InputGroup, Badge, Spinner } from 'react-bootstrap'
 import API from '../../utils/Api'
 import generateRoomId from '../../utils/roomId'
 import { useAuth } from '../../context/AuthContext'
 import { useChat } from '../../context/ChatContext'
+import MediaMessage from './MediaMessage'
 
 const ChatWindow = () => {
   const { user } = useAuth()
@@ -12,42 +14,54 @@ const ChatWindow = () => {
   const [messages, setMessages] = useState([])
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [connected, setConnected] = useState(false)
   const [roomId, setRoomId] = useState(null)
   const [emailInput, setEmailInput] = useState('')
   const [roomError, setRoomError] = useState('')
   const bottomRef = useRef(null)
+  const fileInputRef = useRef(null)
   const receiverRef = useRef(selectedUser)
 
   useEffect(() => {
     receiverRef.current = selectedUser
   }, [selectedUser])
 
-  //  Socket listeners 
   useEffect(() => {
     if (!socket) return
 
     socket.on('connect', () => setConnected(true))
     socket.on('disconnect', () => setConnected(false))
     socket.on('connect_error', () => setConnected(false))
+    setConnected(socket.connected)
 
-    socket.on('new_message', (msg) => {
-      if (msg.senderId !== user?.id) {
+    // ── Handle ALL incoming messages 
+    const handleIncoming = (msg) => {
+      const currentReceiver = receiverRef.current
+      if (!currentReceiver) return
+
+
+      const isRelevant =
+        msg.senderId === currentReceiver.id ||
+        msg.receiverId === currentReceiver.id
+
+      if (isRelevant && msg.senderId !== user?.id) {
         setMessages(prev => [...prev, msg])
       }
-    })
+    }
 
-    setConnected(socket.connected)
+    socket.on('newMessage', handleIncoming)
+    socket.on('new_message', handleIncoming)
 
     return () => {
       socket.off('connect')
       socket.off('disconnect')
       socket.off('connect_error')
-      socket.off('new_message')
+      socket.off('newMessage', handleIncoming)
+      socket.off('new_message', handleIncoming)
     }
   }, [socket, user?.id])
 
-  // Join room when receiver changes 
   useEffect(() => {
     if (!selectedUser?.email || !user?.email || !socket) return
     const rid = generateRoomId(user.email, selectedUser.email)
@@ -86,7 +100,7 @@ const ChatWindow = () => {
       socket.emit('join_room', rid)
       const { data: msgs } = await API.get(`/messages/${target.id}`)
       setMessages(msgs)
-    } catch (err) {
+    } catch {
       setRoomError('Something went wrong')
     }
   }
@@ -109,6 +123,42 @@ const ChatWindow = () => {
     setMessages(prev => [...prev, msgPayload])
     setText('')
     setSending(false)
+  }
+
+  // ── Upload file → S3 via backend
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0]
+    if (!file || !selectedUser) return
+
+    setUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('receiverId', selectedUser.id)
+      formData.append('type', 'personal')
+
+      const { data } = await API.post('/media/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+
+      //  Add sender's media to UI immediately
+      setMessages(prev => [...prev, {
+        senderId: user.id,
+        receiverId: selectedUser.id,
+        fileUrl: data.fileUrl,
+        fileType: file.type,
+        fileName: file.name,
+        isMedia: true,
+        createdAt: new Date().toISOString(),
+      }])
+
+    } catch (err) {
+      console.error('Upload failed:', err)
+      alert('Upload failed. Check your AWS config.')
+    } finally {
+      setUploading(false)
+      e.target.value = ''
+    }
   }
 
   if (!selectedUser) {
@@ -156,10 +206,19 @@ const ChatWindow = () => {
         {messages.map((msg, i) => {
           const isMine = msg.senderId === user?.id
           return (
-            <div key={msg.id ?? i} className={`d-flex mb-2 ${isMine ? 'justify-content-end' : 'justify-content-start'}`}>
+            <div key={msg.id ?? i}
+              className={`d-flex mb-2 ${isMine ? 'justify-content-end' : 'justify-content-start'}`}>
               <div className="px-3 py-2 rounded-3 shadow-sm"
-                style={{ maxWidth: '60%', background: isMine ? '#0d6efd' : 'white', color: isMine ? 'white' : 'black' }}>
-                <div style={{ fontSize: 14 }}>{msg.message}</div>
+                style={{
+                  maxWidth: '65%',
+                  background: isMine ? '#0d6efd' : 'white',
+                  color: isMine ? 'white' : 'black',
+                }}>
+                {/*  Render media or text */}
+                {msg.isMedia
+                  ? <MediaMessage fileUrl={msg.fileUrl} fileType={msg.fileType} fileName={msg.fileName} />
+                  : <div style={{ fontSize: 14 }}>{msg.message}</div>
+                }
                 <div style={{ fontSize: 11, opacity: 0.7, textAlign: 'right' }}>
                   {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </div>
@@ -172,8 +231,22 @@ const ChatWindow = () => {
 
       {/* Input */}
       <Container fluid className="p-3 border-top bg-white">
+        <input
+          type="file"
+          ref={fileInputRef}
+          style={{ display: 'none' }}
+          accept="image/*,video/*,application/pdf"
+          onChange={handleFileUpload}
+        />
         <Form onSubmit={sendMessage}>
           <InputGroup>
+            <Button
+              variant="outline-secondary"
+              onClick={() => fileInputRef.current.click()}
+              disabled={uploading}
+              title="Attach file">
+              {uploading ? <Spinner size="sm" /> : 'Upload'}
+            </Button>
             <Form.Control
               placeholder={`Message ${selectedUser.name}...`}
               value={text} onChange={e => setText(e.target.value)}
