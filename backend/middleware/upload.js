@@ -19,7 +19,6 @@ const uploadToS3 = async (file) => {
       Key: key,
       Body: file.buffer,
       ContentType: file.mimetype,
-      ACL: "public-read",
     },
   });
   await uploader.done();

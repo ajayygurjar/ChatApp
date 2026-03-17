@@ -49,24 +49,12 @@ const SideBar = () => {
 
             {/* Tab Switcher */}
             <div className="d-flex border-bottom">
-                <button
-                    onClick={() => setTab('personal')}
-                    className="flex-grow-1 py-2 border-0 fw-semibold"
-                    style={{
-                        background: tab === 'personal' ? '#0d6efd' : '#f8f9fa',
-                        color: tab === 'personal' ? 'white' : '#333',
-                        fontSize: 13, cursor: 'pointer',
-                    }}>
+                <button onClick={() => setTab('personal')} className="flex-grow-1 py-2 border-0 fw-semibold"
+                    style={{ background: tab === 'personal' ? '#0d6efd' : '#f8f9fa', color: tab === 'personal' ? 'white' : '#333', fontSize: 13, cursor: 'pointer' }}>
                     Personal
                 </button>
-                <button
-                    onClick={() => setTab('group')}
-                    className="flex-grow-1 py-2 border-0 fw-semibold"
-                    style={{
-                        background: tab === 'group' ? '#198754' : '#f8f9fa',
-                        color: tab === 'group' ? 'white' : '#333',
-                        fontSize: 13, cursor: 'pointer',
-                    }}>
+                <button onClick={() => setTab('group')} className="flex-grow-1 py-2 border-0 fw-semibold"
+                    style={{ background: tab === 'group' ? '#198754' : '#f8f9fa', color: tab === 'group' ? 'white' : '#333', fontSize: 13, cursor: 'pointer' }}>
                     Group
                 </button>
             </div>
@@ -75,10 +63,8 @@ const SideBar = () => {
             {tab === 'personal' && (
                 <>
                     <Container fluid className="p-2 border-bottom">
-                        <Form.Control
-                            size="sm" placeholder="Search users..."
-                            value={search} onChange={e => setSearch(e.target.value)}
-                        />
+                        <Form.Control size="sm" placeholder="Search users..."
+                            value={search} onChange={e => setSearch(e.target.value)} />
                     </Container>
                     <ListGroup variant="flush" className="overflow-auto flex-grow-1">
                         {loading && <div className="text-center mt-4 text-muted"><Spinner size="sm" /> Loading...</div>}
@@ -86,12 +72,8 @@ const SideBar = () => {
                             <div className="text-center text-muted mt-4" style={{ fontSize: 13 }}>No users found</div>
                         )}
                         {filtered.map(u => (
-                            <ListGroup.Item
-                                key={u.id} action
-                                active={u.id === selectedUser?.id}
-                                className="py-3"
-                                onClick={() => selectUser(u)}
-                            >
+                            <ListGroup.Item key={u.id} action active={u.id === selectedUser?.id}
+                                className="py-3" onClick={() => selectUser(u)}>
                                 <div className="d-flex align-items-center gap-2">
                                     <div className="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center fw-bold"
                                         style={{ width: 34, height: 34, flexShrink: 0, fontSize: 14 }}>
@@ -108,7 +90,7 @@ const SideBar = () => {
                 </>
             )}
 
-            {/* Group Tab */}
+            {/* Group Tab — now uses group.name not gId string */}
             {tab === 'group' && (
                 <ListGroup variant="flush" className="overflow-auto flex-grow-1">
                     {joinedGroups.length === 0 ? (
@@ -117,17 +99,19 @@ const SideBar = () => {
                             <span style={{ fontSize: 12 }}>Join or create one →</span>
                         </div>
                     ) : (
-                        joinedGroups.map(gId => (
+                        joinedGroups.map(group => (
                             <ListGroup.Item
-                                key={gId} action
-                                active={gId === activeGroup}
+                                key={group.id}
+                                action
+                                active={group.name === activeGroup}
                                 className="py-3"
-                                onClick={() => selectGroup(gId)}
+                                onClick={() => selectGroup(group.name)}
+
                             >
                                 <div className="d-flex align-items-center gap-2">
                                     <div className="rounded-circle bg-success text-white d-flex align-items-center justify-content-center fw-bold"
                                         style={{ width: 34, height: 34, flexShrink: 0, fontSize: 16 }}>#</div>
-                                    <div style={{ fontSize: 14, fontWeight: 600 }}>{gId}</div>
+                                    <div style={{ fontSize: 14, fontWeight: 600 }}>{group.name}</div>
                                 </div>
                             </ListGroup.Item>
                         ))

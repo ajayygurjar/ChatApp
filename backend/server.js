@@ -9,6 +9,7 @@ const authRoutes = require("./routes/authRoutes");
 const messageRoutes = require("./routes/messageRoutes");
 const userRoutes = require("./routes/userRoutes");
 const mediaRoutes = require("./routes/mediaRoutes");
+const groupRoutes = require("./routes/groupRoutes");
 const initSocket = require("./socket-io/index");
 
 require("./models/User");
@@ -26,11 +27,12 @@ app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/media", mediaRoutes);
+app.use("/api/groups", groupRoutes);
 
 const PORT = process.env.PORT || 5000;
 
 sequelize
-  .sync()
+  .sync({ alter: true })
   .then(() => {
     console.log("MySQL connected, tables ready");
     server.listen(PORT, () =>

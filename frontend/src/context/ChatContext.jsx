@@ -1,7 +1,7 @@
-// src/context/ChatContext.jsx
 import { createContext, useContext, useState, useEffect, useRef } from 'react'
 import { io } from 'socket.io-client'
 import { useAuth } from './AuthContext'
+import API from '../utils/Api'
 
 const ChatContext = createContext()
 
@@ -16,51 +16,81 @@ export const ChatProvider = ({ children }) => {
 
     useEffect(() => {
         if (!user?.id) return
-
         const socket = io('http://localhost:5000', {
             auth: { token: localStorage.getItem('token') },
         })
         socketRef.current = socket
-
         return () => {
             socket.disconnect()
             socketRef.current = null
         }
     }, [user?.id])
 
-    const joinGroup = (groupId) => {
-        setJoinedGroups(prev => prev.includes(groupId) ? prev : [...prev, groupId])
-        setActiveGroup(groupId)
-        setTab('group')
+    useEffect(() => {
+        if (!user?.id) return
+        fetchMyGroups()
+    }, [user?.id])
+
+    const fetchMyGroups = async () => {
+        try {
+            const { data } = await API.get('/groups/my')
+            setJoinedGroups(data)
+
+            setTimeout(() => {
+                if (socketRef.current) {
+                    data.forEach(g => socketRef.current.emit('join_group', g.name))
+                }
+            }, 1000)
+        } catch (err) {
+            console.error('Failed to fetch groups', err)
+        }
     }
 
-    const leaveGroup = (groupId) => {
-        setJoinedGroups(prev => prev.filter(g => g !== groupId))
-        setActiveGroup(null)
+    const joinGroup = async (groupName) => {
+        try {
+            const { data } = await API.post('/groups/join', { name: groupName })
+            const group = data.group
+
+            setJoinedGroups(prev =>
+                prev.find(g => g.id === group.id) ? prev : [...prev, group]
+            )
+            setActiveGroup(group.name)
+            setTab('group')
+            return group
+        } catch (err) {
+            console.error('Failed to join group', err)
+        }
     }
 
-    const selectUser = (user) => {
-        setSelectedUser(user)
+    const leaveGroup = async (groupName) => {
+        try {
+            const group = joinedGroups.find(g => g.name === groupName)
+            if (!group) return
+            await API.post('/groups/leave', { groupId: group.id })
+            setJoinedGroups(prev => prev.filter(g => g.name !== groupName))
+            setActiveGroup(null)
+        } catch (err) {
+            console.error('Failed to leave group', err)
+        }
+    }
+
+    const selectUser = (u) => {
+        setSelectedUser(u)
         setTab('personal')
     }
 
-    const selectGroup = (groupId) => {
-        setActiveGroup(groupId)
+    const selectGroup = (groupName) => {
+        setActiveGroup(groupName)
         setTab('group')
     }
 
     return (
         <ChatContext.Provider value={{
             socket: socketRef.current,
-            tab,
-            setTab,
-            selectedUser,
-            selectUser,
-            joinedGroups,
-            activeGroup,
-            joinGroup,
-            leaveGroup,
-            selectGroup,
+            tab, setTab,
+            selectedUser, selectUser,
+            joinedGroups, activeGroup,
+            joinGroup, leaveGroup, selectGroup,
         }}>
             {children}
         </ChatContext.Provider>
