@@ -12,8 +12,7 @@ const mediaRoutes = require("./routes/mediaRoutes");
 const groupRoutes = require("./routes/groupRoutes");
 const initSocket = require("./socket-io/index");
 
-require("./models/User");
-require("./models/Message");
+require("./models/index");
 
 const app = express();
 const server = http.createServer(app);

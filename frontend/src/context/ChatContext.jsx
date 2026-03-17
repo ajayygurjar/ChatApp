@@ -12,17 +12,23 @@ export const ChatProvider = ({ children }) => {
     const [selectedUser, setSelectedUser] = useState(null)
     const [joinedGroups, setJoinedGroups] = useState([])
     const [activeGroup, setActiveGroup] = useState(null)
+    const [socket, setSocket] = useState(null)   
     const socketRef = useRef(null)
 
     useEffect(() => {
         if (!user?.id) return
-        const socket = io('http://localhost:5000', {
+
+        const s = io('http://localhost:5000', {
             auth: { token: localStorage.getItem('token') },
         })
-        socketRef.current = socket
+
+        socketRef.current = s
+        setSocket(s)
+
         return () => {
-            socket.disconnect()
+            s.disconnect()
             socketRef.current = null
+            setSocket(null)
         }
     }, [user?.id])
 
@@ -31,26 +37,26 @@ export const ChatProvider = ({ children }) => {
         fetchMyGroups()
     }, [user?.id])
 
+
+    useEffect(() => {
+        if (!socket || joinedGroups.length === 0) return
+        joinedGroups.forEach(g => socket.emit('join_group', g.name))
+    }, [socket])
+
     const fetchMyGroups = async () => {
         try {
             const { data } = await API.get('/groups/my')
             setJoinedGroups(data)
-
-            setTimeout(() => {
-                if (socketRef.current) {
-                    data.forEach(g => socketRef.current.emit('join_group', g.name))
-                }
-            }, 1000)
         } catch (err) {
             console.error('Failed to fetch groups', err)
         }
     }
 
+
     const joinGroup = async (groupName) => {
         try {
             const { data } = await API.post('/groups/join', { name: groupName })
             const group = data.group
-
             setJoinedGroups(prev =>
                 prev.find(g => g.id === group.id) ? prev : [...prev, group]
             )
@@ -74,19 +80,12 @@ export const ChatProvider = ({ children }) => {
         }
     }
 
-    const selectUser = (u) => {
-        setSelectedUser(u)
-        setTab('personal')
-    }
-
-    const selectGroup = (groupName) => {
-        setActiveGroup(groupName)
-        setTab('group')
-    }
+    const selectUser = (u) => { setSelectedUser(u); setTab('personal') }
+    const selectGroup = (groupName) => { setActiveGroup(groupName); setTab('group') }
 
     return (
         <ChatContext.Provider value={{
-            socket: socketRef.current,
+            socket,
             tab, setTab,
             selectedUser, selectUser,
             joinedGroups, activeGroup,

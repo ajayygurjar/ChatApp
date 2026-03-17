@@ -14,6 +14,7 @@ const GroupChat = () => {
     const [groupInput, setGroupInput] = useState('')
     const [users, setUsers] = useState({})
     const [uploading, setUploading] = useState(false)
+    const [joining, setJoining] = useState(false)
     const bottomRef = useRef(null)
     const fileInputRef = useRef(null)
 
@@ -55,19 +56,26 @@ const GroupChat = () => {
         bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, [messages])
 
-    const handleJoinGroup = (e) => {
+
+    const handleJoinGroup = async (e) => {
         e.preventDefault()
         if (!groupInput.trim() || !socket) return
-        const gId = groupInput.trim().toLowerCase().replace(/\s+/g, '-')
-        socket.emit('join_group', gId)
-        joinGroup(gId)
-        setGroupInput('')
+        setJoining(true)
+        try {
+            const group = await joinGroup(groupInput.trim())
+            if (group) {
+                socket.emit('join_group', group.name)
+            }
+            setGroupInput('')
+        } finally {
+            setJoining(false)
+        }
     }
 
-    const handleLeaveGroup = () => {
+    const handleLeaveGroup = async () => {
         if (!activeGroup || !socket) return
         socket.emit('leave_group', activeGroup)
-        leaveGroup(activeGroup)
+        await leaveGroup(activeGroup)
     }
 
     const sendMessage = async (e) => {
@@ -92,7 +100,6 @@ const GroupChat = () => {
             console.error('Failed to save group message', err)
         }
     }
-
 
     const handleFileUpload = async (e) => {
         const file = e.target.files[0]
@@ -132,7 +139,6 @@ const GroupChat = () => {
             <div className="d-flex flex-column flex-grow-1 align-items-center justify-content-center"
                 style={{ height: '100vh', background: '#f0f2f5' }}>
                 <div style={{ textAlign: 'center', marginBottom: 24 }}>
-                    <div style={{ fontSize: 48 }}></div>
                     <div className="fw-semibold fs-5">Group Chat</div>
                     <div className="text-muted" style={{ fontSize: 13 }}>Create or join a group</div>
                 </div>
@@ -142,7 +148,9 @@ const GroupChat = () => {
                             placeholder="Enter group name..."
                             value={groupInput} onChange={e => setGroupInput(e.target.value)}
                         />
-                        <Button type="submit" variant="success">Join / Create</Button>
+                        <Button type="submit" variant="success" disabled={joining}>
+                            {joining ? <Spinner size="sm" /> : 'Join / Create'}
+                        </Button>
                     </InputGroup>
                     <small className="text-muted d-block mt-1" style={{ fontSize: 12 }}>
                         Share the name with others so they can join
@@ -200,21 +208,14 @@ const GroupChat = () => {
 
             {/* Input */}
             <Container fluid className="p-3 border-top bg-white">
-                <input
-                    type="file"
-                    ref={fileInputRef}
-                    style={{ display: 'none' }}
-                    accept="image/*,video/*,application/pdf"
-                    onChange={handleFileUpload}
-                />
+                <input type="file" ref={fileInputRef} style={{ display: 'none' }}
+                    accept="image/*,video/*,application/pdf" onChange={handleFileUpload} />
                 <Form onSubmit={sendMessage}>
                     <InputGroup>
-                        <Button
-                            variant="outline-secondary"
+                        <Button variant="outline-secondary"
                             onClick={() => fileInputRef.current.click()}
-                            disabled={uploading}
-                            title="Attach file">
-                            {uploading ? <Spinner size="sm" /> : '📎'}
+                            disabled={uploading} title="Attach file">
+                            {uploading ? <Spinner size="sm" /> : 'Upload'}
                         </Button>
                         <Form.Control
                             placeholder={`Message #${activeGroup}...`}
