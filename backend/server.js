@@ -11,6 +11,7 @@ const userRoutes = require("./routes/userRoutes");
 const mediaRoutes = require("./routes/mediaRoutes");
 const groupRoutes = require("./routes/groupRoutes");
 const initSocket = require("./socket-io/index");
+const { startArchiveJob } = require("./jobs/archiveMessages");
 
 require("./models/index");
 
@@ -34,6 +35,7 @@ sequelize
   .sync({ alter: true })
   .then(() => {
     console.log("MySQL connected, tables ready");
+    startArchiveJob();
     server.listen(PORT, () =>
       console.log(`Server running on http://localhost:${PORT}`),
     );
