@@ -10,6 +10,7 @@ const messageRoutes = require("./routes/messageRoutes");
 const userRoutes = require("./routes/userRoutes");
 const mediaRoutes = require("./routes/mediaRoutes");
 const groupRoutes = require("./routes/groupRoutes");
+const aiRoutes = require("./routes/aiRoutes");
 const initSocket = require("./socket-io/index");
 const { startArchiveJob } = require("./jobs/archiveMessages");
 
@@ -28,6 +29,7 @@ app.use("/api/messages", messageRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/media", mediaRoutes);
 app.use("/api/groups", groupRoutes);
+app.use("/api/ai", aiRoutes);
 
 const PORT = process.env.PORT || 5000;
 
